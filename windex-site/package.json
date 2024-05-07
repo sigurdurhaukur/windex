@@ -1,0 +1,22 @@
+{
+  "name": "windex_site",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev & node data.js",
+    "build": "next build",
+    "start": "next start & node data.js",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "chart.js": "^4.4.2",
+    "next": "14.2.3",
+    "react": "^18",
+    "react-chartjs-2": "^5.2.0",
+    "react-dom": "^18"
+  },
+  "devDependencies": {
+    "eslint": "^8",
+    "eslint-config-next": "14.2.3"
+  }
+}
