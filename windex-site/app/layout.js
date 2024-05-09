@@ -11,7 +11,14 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en">
-      <body className={inter.className}>{children}</body>
+      <body className={inter.className}>
+        {children}
+
+        <footer>
+          <p>Developed by: Sigurdur Haukur Birgisson</p>
+          <p>Copyright © {new Date().getFullYear()}</p>
+        </footer>
+      </body>
     </html>
   );
 }

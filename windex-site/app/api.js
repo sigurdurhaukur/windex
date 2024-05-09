@@ -4,7 +4,7 @@ const fs = require("fs");
 export async function getData(airport_code = "BIRK") {
   const url = `https://iws.isavia.is/weather/${airport_code}`;
 
-  const response = await fetch(url);
+  const response = await fetch(url, { next: { revalidate: 0 } });
   const data = await response.json();
 
   return data;

@@ -1,176 +1,144 @@
 "use client";
 import { getData, getHistoricData } from "./api";
 import { useState, useEffect } from "react";
-import {
-  Chart as ChartJS,
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend,
-  scales,
-} from "chart.js";
-import { Line } from "react-chartjs-2";
-
-ChartJS.register(
-  LineElement,
-  PointElement,
-  CategoryScale,
-  LinearScale,
-  Title,
-  Tooltip,
-  Legend
-);
+import Header from "./header";
+import formatTimestamp from "./utils";
+import Plot from "./plot";
 
 export default function Home() {
   const [historicData, setHistoricData] = useState({
     windDirection: [],
     timestamp: [],
+    airTemperature: [],
+    tempTimestamp: [],
+    windSpeed: [],
+    windSpeedTimestamp: [],
   });
-  const [result, setResult] = useState(null);
-  const [allData, setAllData] = useState();
+  const [allData, setAllData] = useState(null);
 
-  // Function to convert timestamp to H:M:S format
-  function formatTimestamp(ts) {
-    const date = new Date(ts * 1000); // Assuming timestamps are in seconds
-    const hours = date.getHours().toString().padStart(2, "0");
-    const minutes = date.getMinutes().toString().padStart(2, "0");
-    const seconds = date.getSeconds().toString().padStart(2, "0");
-    return `${hours}:${minutes}:${seconds}`;
+  async function fetchLiveData() {
+    try {
+      const data = await getData();
+      if (data?.data?.rwyTdz31?.windDirection) {
+        updateHistoricData(
+          data.data.rwyTdz31.windDirection.value,
+          data.data.rwyTdz31.windDirection.timestamp,
+          data.data.rwyTdz01.tempAir.value,
+          data.data.rwyTdz01.tempAir.timestamp,
+          data.data.rwyTdz31.windSpeed.value,
+          data.data.rwyTdz31.windSpeed.timestamp
+        );
+        setAllData(data);
+      } else {
+        console.error("Missing expected wind direction data");
+      }
+    } catch (error) {
+      console.error("Error fetching live data:", error);
+    }
   }
 
-  // Log messages to identify data issues
+  function updateHistoricData(
+    windDir,
+    windTs,
+    airTemp,
+    tempTs,
+    windSpeed,
+    windSpeedTs
+  ) {
+    setHistoricData((prev) => ({
+      windDirection: [...prev.windDirection, windDir],
+      timestamp: [...prev.timestamp, windTs],
+      airTemperature: [...prev.airTemperature, airTemp],
+      tempTimestamp: [...prev.tempTimestamp, tempTs],
+      windSpeed: [...prev.windSpeed, windSpeed],
+      windSpeedTimestamp: [...prev.windSpeedTimestamp, windSpeedTs],
+    }));
+  }
+
+  async function fetchHistoricData() {
+    try {
+      const data = await getHistoricData();
+      const initialHistoricData = {
+        windDirection: data.map((d) => d.windDirection),
+        timestamp: data.map((d) => d.timestamp),
+        airTemperature: historicData.airTemperature,
+        tempTimestamp: historicData.tempTimestamp,
+        windSpeed: historicData.windSpeed,
+        windSpeedTimestamp: historicData.windSpeedTimestamp,
+      };
+      setHistoricData(initialHistoricData);
+    } catch (error) {
+      console.error("Error fetching historic data:", error);
+    }
+  }
+
   useEffect(() => {
-    let collectedHistoricData = { windDirection: [], timestamp: [] };
-    getHistoricData().then((data) => {
-      console.log("Historic data:", data);
+    // Load historic data and set interval for live data fetching
+    fetchHistoricData();
+    fetchLiveData();
+    const interval = setInterval(fetchLiveData, 30 * 1000);
 
-      data.forEach((d) => {
-        let windDir = d.windDirection;
-        let ts = d.timestamp;
-
-        collectedHistoricData.windDirection.push(windDir);
-        collectedHistoricData.timestamp.push(formatTimestamp(ts));
-      });
-      setHistoricData(collectedHistoricData);
-    });
-
-    const interval = setInterval(async () => {
-      try {
-        // Make sure getData returns the right data structure
-        const data = await getData();
-        console.log("Fetched data:", data);
-        setAllData(data);
-
-        // Make sure the data contains what we expect
-        if (data?.data?.rwyTdz31?.windDirection) {
-          const windDir = data.data.rwyTdz31.windDirection.value;
-          const ts = data.data.rwyTdz31.windDirection.timestamp;
-
-          // Update the latest result for display
-          setResult({
-            ...data.data.rwyTdz31.windDirection,
-            timestamp: formatTimestamp(ts),
-          });
-
-          // Append new data to historicData
-          setHistoricData((prevHistoricData) => ({
-            windDirection: [...prevHistoricData.windDirection, windDir],
-            timestamp: [...prevHistoricData.timestamp, formatTimestamp(ts)],
-          }));
-        } else {
-          console.error("Missing expected wind direction data");
-        }
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      }
-    }, 5 * 1000);
-
+    // Cleanup interval on component unmount
     return () => clearInterval(interval);
   }, []);
 
-  const chartData = {
-    labels: historicData.timestamp,
-    datasets: [
-      {
-        label: "Wind Direction",
-        data: historicData.windDirection,
-        borderColor: "blue",
-        backgroundColor: "rgba(0, 0, 255, 0.3)",
-        fill: true,
-        tension: 0.3,
-      },
-    ],
-  };
-  const chartOptions = {
-    responsive: true,
-    plugins: {
-      legend: {
-        display: true,
-        position: "top",
-      },
-      title: {
-        display: true,
-        text: "Wind Direction Over Time",
-      },
-    },
-    scales: {
-      y: {
-        min: 0,
-        max: 360,
-      },
-    },
-  };
+  // Render plots only if historic data is available
+  function renderPlots() {
+    return (
+      <>
+        <Plot
+          data={{ x: historicData.timestamp, y: historicData.windDirection }}
+          options={{
+            label: "Wind direction",
+            title: "Wind direction vs. time",
+            xLabel: "Time",
+            yLabel: "Wind direction (°)",
+            range: { min: 0, max: 360 },
+            color: "blue",
+            rgba: "rgba(0, 0, 255, 0.2)",
+          }}
+        />
+        <Plot
+          data={{
+            x: historicData.tempTimestamp,
+            y: historicData.airTemperature,
+          }}
+          options={{
+            label: "Air temperature",
+            title: "Air temperature vs. time",
+            xLabel: "Time",
+            yLabel: "Temperature (°C)",
+            range: { min: -30, max: 30 },
+            color: "red",
+            rgba: "rgba(255, 0, 0, 0.2)",
+          }}
+        />
+        <Plot
+          data={{
+            x: historicData.windSpeedTimestamp,
+            y: historicData.windSpeed,
+          }}
+          options={{
+            label: "Wind speed",
+            title: "Wind speed vs. time",
+            xLabel: "Time",
+            yLabel: "Wind speed (m/s)",
+            range: { min: 0, max: 30 },
+            color: "green",
+            rgba: "rgba(0, 255, 0, 0.2)",
+          }}
+        />
+      </>
+    );
+  }
 
   return (
     <main>
       <h1>Windex</h1>
-      <div>
-        <h2>Currently:</h2>
-        {!allData && <p>Loading... This should take approximately 5 seconds</p>}
-        {allData && (
-          <>
-            <p>
-              wind direction: {allData.data.rwyTdz01.windDirection.value}
-              {allData.data.rwyTdz01.windDirection.unit}
-            </p>
-            <p>timestamp: {formatTimestamp(allData.timestamp)}</p>
-            <p>
-              Humidity: {allData.data.rwyTdz01.humidity.value}
-              {allData.data.rwyTdz01.humidity.unit}
-            </p>
-            <p>
-              Air temperature: {allData.data.rwyTdz01.tempAir.value}
-              {allData.data.rwyTdz01.tempAir.unit}
-            </p>
-            <p>
-              Wind speed: {allData.data.rwyTdz01.windSpeed.value}
-              {allData.data.rwyTdz01.windSpeed.unit}
-            </p>
-          </>
-        )}
-      </div>
-
-      <h2>Wind direction vs. time</h2>
-      <Line data={chartData} options={chartOptions} />
-      <table>
-        <thead>
-          <tr>
-            <th>Wind Direction</th>
-            <th>Timestamp</th>
-          </tr>
-        </thead>
-        <tbody>
-          {historicData.windDirection.map((dir, i) => (
-            <tr key={i}>
-              <td>{dir}</td>
-              <td>{historicData.timestamp[i]}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
+      <Header data={allData} />
+      <h2>Historic data</h2>
+      {allData && <p>last updated {formatTimestamp(allData.timestamp)}</p>}
+      {historicData && renderPlots()}
     </main>
   );
 }
