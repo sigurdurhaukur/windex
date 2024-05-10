@@ -3,8 +3,8 @@ const fs = require("fs");
 function saveData(data, maxDataPoints = 1000) {
   // Extract the relevant data into an object
   const cleaned = {
-    windDirection: data.data.rwyTdz31.windDirection.value,
     timestamp: data.data.rwyTdz31.windDirection.timestamp,
+    windDirection: data.data.rwyTdz31.windDirection.value,
   };
 
   // Initialize `historicData` array if the file doesn't exist or is empty

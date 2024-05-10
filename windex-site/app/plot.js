@@ -18,21 +18,28 @@ ChartJS.register(
   LinearScale,
   Title,
   Tooltip,
-  Legend
+  Legend,
 );
 
 export default function ScatterLinePlot({ data, options }) {
-  const scatterDataPoints = data.x.map((xVal, index) => ({
-    x: xVal,
-    y: data.y[index],
-  }));
+  if (!data || !data.length) {
+    return <p>no data recieved</p>;
+  }
+
+  const scatterPoints = data.map((d) => {
+    const [firstKey, secondKey] = Object.keys(d);
+    return {
+      x: d[firstKey],
+      y: d[secondKey],
+    };
+  }); // rename to x and y
 
   const chartData = {
     datasets: [
       {
         type: "line",
         label: `${options.label} - Line`,
-        data: scatterDataPoints,
+        data: scatterPoints,
         borderColor: options.color || "rgba(75,192,192,1)",
         fill: false,
         tension: 0.3,

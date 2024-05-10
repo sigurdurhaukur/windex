@@ -2,17 +2,15 @@
 import { getData, getHistoricData } from "./api";
 import { useState, useEffect } from "react";
 import Header from "./header";
+import Reccomendation from "./reccomendation";
 import formatTimestamp from "./utils";
 import Plot from "./plot";
 
 export default function Home() {
   const [historicData, setHistoricData] = useState({
     windDirection: [],
-    timestamp: [],
     airTemperature: [],
-    tempTimestamp: [],
     windSpeed: [],
-    windSpeedTimestamp: [],
   });
   const [allData, setAllData] = useState(null);
 
@@ -20,52 +18,37 @@ export default function Home() {
     try {
       const data = await getData();
       if (data?.data?.rwyTdz31?.windDirection) {
-        updateHistoricData(
-          data.data.rwyTdz31.windDirection.value,
-          data.data.rwyTdz31.windDirection.timestamp,
-          data.data.rwyTdz01.tempAir.value,
-          data.data.rwyTdz01.tempAir.timestamp,
-          data.data.rwyTdz31.windSpeed.value,
-          data.data.rwyTdz31.windSpeed.timestamp
+        const new_data = historicData;
+
+        new_data.windDirection.push(
+          (data.data.rwyTdz31.windDirection.timestamp,
+          data.data.rwyTdz31.windDirection.value),
         );
+        new_data.airTemperature.push({
+          timestamp: data.data.rwyTdz01.tempAir.timestamp,
+          airTemperature: data.data.rwyTdz01.tempAir.value,
+        });
+
+        new_data.windSpeed.push({
+          timestamp: data.data.rwyTdz31.windSpeed.timestamp,
+          windSpeed: data.data.rwyTdz31.windSpeed.value,
+        });
+
         setAllData(data);
+        setHistoricData(new_data);
       } else {
-        console.error("Missing expected wind direction data");
+        console.error("Error parsing data from server");
       }
     } catch (error) {
       console.error("Error fetching live data:", error);
     }
   }
 
-  function updateHistoricData(
-    windDir,
-    windTs,
-    airTemp,
-    tempTs,
-    windSpeed,
-    windSpeedTs
-  ) {
-    setHistoricData((prev) => ({
-      windDirection: [...prev.windDirection, windDir],
-      timestamp: [...prev.timestamp, windTs],
-      airTemperature: [...prev.airTemperature, airTemp],
-      tempTimestamp: [...prev.tempTimestamp, tempTs],
-      windSpeed: [...prev.windSpeed, windSpeed],
-      windSpeedTimestamp: [...prev.windSpeedTimestamp, windSpeedTs],
-    }));
-  }
-
   async function fetchHistoricData() {
     try {
       const data = await getHistoricData();
-      const initialHistoricData = {
-        windDirection: data.map((d) => d.windDirection),
-        timestamp: data.map((d) => d.timestamp),
-        airTemperature: historicData.airTemperature,
-        tempTimestamp: historicData.tempTimestamp,
-        windSpeed: historicData.windSpeed,
-        windSpeedTimestamp: historicData.windSpeedTimestamp,
-      };
+      const initialHistoricData = historicData;
+      initialHistoricData.windDirection = data;
       setHistoricData(initialHistoricData);
     } catch (error) {
       console.error("Error fetching historic data:", error);
@@ -76,7 +59,7 @@ export default function Home() {
     // Load historic data and set interval for live data fetching
     fetchHistoricData();
     fetchLiveData();
-    const interval = setInterval(fetchLiveData, 30 * 1000);
+    const interval = setInterval(fetchLiveData, 3 * 1000);
 
     // Cleanup interval on component unmount
     return () => clearInterval(interval);
@@ -87,7 +70,7 @@ export default function Home() {
     return (
       <>
         <Plot
-          data={{ x: historicData.timestamp, y: historicData.windDirection }}
+          data={historicData.windDirection}
           options={{
             label: "Wind direction",
             title: "Wind direction vs. time",
@@ -99,10 +82,7 @@ export default function Home() {
           }}
         />
         <Plot
-          data={{
-            x: historicData.tempTimestamp,
-            y: historicData.airTemperature,
-          }}
+          data={historicData.airTemperature}
           options={{
             label: "Air temperature",
             title: "Air temperature vs. time",
@@ -114,10 +94,7 @@ export default function Home() {
           }}
         />
         <Plot
-          data={{
-            x: historicData.windSpeedTimestamp,
-            y: historicData.windSpeed,
-          }}
+          data={historicData.windSpeed}
           options={{
             label: "Wind speed",
             title: "Wind speed vs. time",
@@ -134,8 +111,12 @@ export default function Home() {
 
   return (
     <main>
-      <h1>Windex</h1>
+      <div className="logo">
+        <h1>Windex</h1>
+        <img src="/logo.png" alt="Windex logo" />
+      </div>
       <Header data={allData} />
+      {allData && <Reccomendation data={allData} />}
       <h2>Historic data</h2>
       {allData && <p>last updated {formatTimestamp(allData.timestamp)}</p>}
       {historicData && renderPlots()}
