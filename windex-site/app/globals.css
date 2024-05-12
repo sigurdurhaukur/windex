@@ -1,5 +1,6 @@
 main {
   max-width: 80ch;
+  min-height: 75vh;
   margin: 0 auto;
 }
 
@@ -14,9 +15,47 @@ footer {
   margin-top: 2rem;
 }
 
+
+nav {
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+}
+
+nav ul {
+  display: flex;
+  justify-content: space-between;
+  max-width: 80ch;
+  margin: 0 auto;
+  align-items: center;
+  gap: 1rem;
+}
+
+nav li {
+  list-style: none;
+  align-self: center;
+}
+
+nav a {
+  color: var(--text);
+  text-decoration: none;
+}
+
+nav a:hover {
+  text-decoration: underline;
+}
+
+nav .active {
+  font-weight: bold;
+}
+
+
 .logo {
   display: flex;
+  font-wheight: bold;
+  font-size: 1.5rem;
 }
+
+
 
 .logo img {
   display: block;

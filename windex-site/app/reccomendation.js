@@ -16,7 +16,7 @@ export default function Recommendation({ data }) {
 
   return (
     <div>
-      <h2>Recommendation</h2>
+      <h2>Text description</h2>
       <p>{evaluateWindSpeed(weather_stations)}</p>
     </div>
   );

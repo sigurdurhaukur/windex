@@ -111,10 +111,7 @@ export default function Home() {
 
   return (
     <main>
-      <div className="logo">
-        <h1>Windex</h1>
-        <img src="/logo.png" alt="Windex logo" />
-      </div>
+      <div className="logo"></div>
       <Header data={allData} />
       {allData && <Reccomendation data={allData} />}
       <h2>Historic data</h2>
