@@ -71,7 +71,7 @@ export default function About() {
               <strong>Wind Rose</strong> — A compass plot showing the frequency of wind from each direction and average speed per sector.
             </li>
             <li>
-              <strong>Wind Map</strong> — Geographic visualization of wind patterns across the airport's runway systems.
+              <strong>Wind Map</strong> — Geographic visualization of wind patterns across the airport&apos;s runway systems.
             </li>
             <li>
               <strong>Pressure Trend</strong> — QNH (barometric) pressure indicates incoming weather. A sustained drop signals deteriorating conditions;
@@ -128,7 +128,7 @@ export default function About() {
           <h2>Frequently Asked Questions</h2>
           <div className="faq-item">
             <h4>Why only BIRK?</h4>
-            <p>BIRK (Reykjavík Airport) has comprehensive weather infrastructure and is strategically located for monitoring Reykjavík's sailing and maritime conditions. Future versions may expand to other locations.</p>
+            <p>BIRK (Reykjavík Airport) has comprehensive weather infrastructure and is strategically located for monitoring Reykjavík&apos;s sailing and maritime conditions. Future versions may expand to other locations.</p>
           </div>
           <div className="faq-item">
             <h4>Is this official BIRK data?</h4>
@@ -136,7 +136,7 @@ export default function About() {
           </div>
           <div className="faq-item">
             <h4>How accurate is the wind data?</h4>
-            <p>Data is sourced directly from BIRK's automated weather station equipment. Accuracy depends on sensor maintenance and calibration. For mission-critical decisions, always consult official sources.</p>
+            <p>Data is sourced directly from BIRK&apos;s automated weather station equipment. Accuracy depends on sensor maintenance and calibration. For mission-critical decisions, always consult official sources.</p>
           </div>
           <div className="faq-item">
             <h4>Can I download the data?</h4>
