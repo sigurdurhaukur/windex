@@ -13,6 +13,7 @@ import {
 } from "chart.js";
 import { Line } from "react-chartjs-2";
 import formatTimestamp from "./utils";
+import { recenterWindDirection } from "./circular-utils";
 
 ChartJS.register(
   LineElement,
@@ -42,6 +43,9 @@ export default function ScatterLinePlot({
   const valueKey = data && data.length
     ? Object.keys(data[0]).find((k) => k !== "timestamp")
     : null;
+
+  const isWindDirection = valueKey === "windDirection";
+  const processedData = isWindDirection ? recenterWindDirection(data) : data;
 
   const handleFullscreen = async () => {
     if (!containerRef.current) return;
@@ -88,11 +92,18 @@ export default function ScatterLinePlot({
     return <p>no data recieved</p>;
   }
 
-  const filteredData = data.slice(-dataPointsToShow);
+  const filteredData = processedData.slice(-dataPointsToShow);
   const scatterPoints = filteredData.map((d) => ({
     x: d.timestamp,
-    y: d[valueKey],
+    y: isWindDirection ? d.windDirectionCentered : d[valueKey],
   }));
+
+  const referencePoints = isWindDirection
+    ? filteredData.map((d) => ({
+      x: d.timestamp,
+      y: d.rollingReference,
+    }))
+    : [];
 
   // Build per-point radius and color arrays for pulse effect
   const lastIdx = scatterPoints.length - 1;
@@ -115,7 +126,10 @@ export default function ScatterLinePlot({
   let yMin = options.range?.min;
   let yMax = options.range?.max;
 
-  if (allYValues.length > 0) {
+  if (isWindDirection) {
+    yMin = -180;
+    yMax = 180;
+  } else if (allYValues.length > 0) {
     const dataMin = Math.min(...allYValues);
     const dataMax = Math.max(...allYValues);
     const range = dataMax - dataMin;
@@ -144,6 +158,16 @@ export default function ScatterLinePlot({
       tension: 0.3,
       pointRadius: 0,
       borderDash: [4, 4],
+    }] : []),
+    ...(referencePoints.length ? [{
+      label: "Rolling mean",
+      data: referencePoints,
+      borderColor: "rgba(200, 150, 100, 0.6)",
+      backgroundColor: "transparent",
+      fill: false,
+      tension: 0.3,
+      pointRadius: 0,
+      borderDash: [2, 2],
     }] : []),
     {
       type: "line",
@@ -203,7 +227,7 @@ export default function ScatterLinePlot({
       y: {
         title: {
           display: true,
-          text: options.yLabel || "Y-Axis",
+          text: isWindDirection ? "Δ Direction (°)" : (options.yLabel || "Y-Axis"),
           color: isDarkMode ? "#fff" : "#1a1a1a",
         },
         min: yMin,

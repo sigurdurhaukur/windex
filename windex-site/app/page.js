@@ -248,7 +248,7 @@ export default function Home() {
           data={selectedSensorData.windDirection}
           isDarkMode={isDarkMode}
           dataPointsToShow={windDirPoints}
-          description="Wind direction over time in degrees (0°/360° = N, 90° = E, 180° = S, 270° = W). Useful for spotting persistent shifts or backing and veering patterns."
+          description="Wind direction deviation from rolling mean (center). Y-axis shows degrees off the recent wind direction. Rolling mean (tan dashed line) shows the smoothed direction trend."
           options={{
             label: "Wind direction",
             title: `Wind direction — ${stationName}`,
