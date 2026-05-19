@@ -5,7 +5,7 @@ volumes:
 services:
   backend:
     build: .
-    container_name: windex-backend
+    container_name: windex-backend-dev
     ports:
       - "5123:5001"
     volumes:
@@ -20,14 +20,17 @@ services:
     build:
       context: ./windex-site
       dockerfile: Dockerfile
-      target: prod
-    container_name: windex-frontend
+      target: dev
+    container_name: windex-frontend-dev
     ports:
       - "3123:3000"
     volumes:
+      - ./windex-site:/app
       - cache_data:/data/cache
+      - /app/node_modules
+      - /app/.next
     environment:
-      - NODE_ENV=production
+      - NODE_ENV=development
       - BACKEND_URL=http://backend:5123
     depends_on:
       - backend
