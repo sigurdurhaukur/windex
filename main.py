@@ -4,9 +4,51 @@ from sklearn.metrics import mean_squared_error
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.animation import FuncAnimation
+from datetime import datetime, timedelta
+import os
 
 
-def only_train_model_no_visuals(path_to_data="wind_data.txt"):
+def load_and_clean_data(path_to_data="wind_data/wind_data.txt"):
+    """Load data and remove entries older than 1 day. Timestamps are Unix epoch seconds."""
+    if not os.path.exists(path_to_data):
+        return [], []
+
+    timestamp = []
+    wind_dir = []
+    cutoff_ts = (datetime.now() - timedelta(days=1)).timestamp()
+
+    with open(path_to_data, "r") as f:
+        lines = f.readlines()
+
+    valid_lines = []
+    for line in lines:
+        try:
+            ts_str, direction = line.strip().split(",")
+            ts = float(ts_str)
+            if ts > cutoff_ts:
+                timestamp.append(ts)
+                wind_dir.append(float(direction))
+                valid_lines.append(line)
+        except (ValueError, IndexError):
+            continue
+
+    with open(path_to_data, "w") as f:
+        f.writelines(valid_lines)
+
+    return timestamp, wind_dir
+
+
+def save_data_point(path_to_data, timestamp, wind_dir):
+    """Append a single data point and clean old data."""
+    with open(path_to_data, "a") as f:
+        f.write(f"{timestamp},{wind_dir}\n")
+
+    # Clean old data periodically (timestamp is a Unix epoch float)
+    if int(float(timestamp)) % 50 == 0:
+        load_and_clean_data(path_to_data)
+
+
+def only_train_model_no_visuals(path_to_data="wind_data/wind_data.txt"):
     model = Model()
     scaler_X, scaler_y = model.pretrain_model(epoch=2, path_to_data=path_to_data)
 
@@ -44,7 +86,7 @@ def only_train_model_no_visuals(path_to_data="wind_data.txt"):
             print(f"Mean Squared Error: {mse}")
 
 
-def main(path_to_data="wind_data.txt"):
+def main(path_to_data="wind_data/wind_data.txt"):
     model = Model()
     batch_size = 12
     t_into_future = 30
@@ -53,8 +95,8 @@ def main(path_to_data="wind_data.txt"):
     # Initialize the plot
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    timestamp = []
-    wind_dir = []
+    # Load persistent data
+    timestamp, wind_dir = load_and_clean_data(path_to_data)
 
     def setup_plot():
         ax.set_title("Real-Time Wind Direction")
@@ -70,10 +112,10 @@ def main(path_to_data="wind_data.txt"):
         # online training
         if i % batch_size == 0 and len(wind_dir) > batch_size:
             test_index = batch_size // 2
-            X = np.array(wind_dir)[-batch_size:-test_index:].reshape(-1, 1)
-            y = np.array(timestamp)[-batch_size:-test_index]
-            X_test = np.array(wind_dir)[-test_index:].reshape(-1, 1)
-            y_test = np.array(timestamp)[-test_index:]
+            X = np.array(timestamp)[-batch_size:-test_index]
+            y = np.array(wind_dir)[-batch_size:-test_index]
+            X_test = np.array(timestamp)[-test_index:]
+            y_test = np.array(wind_dir)[-test_index:]
 
             assert len(X) == len(y) == batch_size - test_index and len(X) > 0
 
@@ -84,21 +126,18 @@ def main(path_to_data="wind_data.txt"):
         setup_plot()
         ax.plot(timestamp, wind_dir, "b")
 
-        # Predict the next 10 seconds
+        # Predict the next t_into_future seconds
         if len(wind_dir) > batch_size:
-            # predict from the first timestamp
-            next_t_seconds = np.arange(timestamp[0], timestamp[-1] + t_into_future, 1)
-
-            # predict from the last timestamp
-            # next_t_seconds = np.arange(timestamp[-1], timestamp[-1] + t_into_future, 1)
-            y_pred = model.predict(next_t_seconds)
+            # predict from the last timestamp into the future
+            next_t_seconds = np.arange(timestamp[-1], timestamp[-1] + t_into_future, 1)
+            y_pred = model.predict(None, steps_ahead=len(next_t_seconds))
             ax.plot(next_t_seconds, y_pred, "r--")
             ax.legend(["Actual", "Predicted"])
         else:
             ax.legend(["Actual"])
 
-        with open(path_to_data, "a") as f:
-            f.write(f"{timestamp[-1]},{wind_dir[-1]}\n")
+        # Save data persistently
+        save_data_point(path_to_data, timestamp[-1], wind_dir[-1])
 
     ani = FuncAnimation(fig, animate, interval=2000, cache_frame_data=False)
     plt.show()
@@ -185,14 +224,14 @@ def test_application():
     test_prediction()
 
 
-def collect_data_for_pretraining(path_to_data="wind_data.txt"):
+def collect_data_for_pretraining(path_to_data="wind_data/wind_data.txt"):
     with open(path_to_data, "a") as f:
         for data in get_weather_data(max_requests=1000):
             f.write(f"{data[0]},{data[1]}\n")
 
 
 if __name__ == "__main__":
-    path_to_data = "wind_data.txt"  # csv format <timestamp, wind_direction>
+    path_to_data = "wind_data/wind_data.txt"  # csv format <timestamp, wind_direction>
 
     # run this function to collect data for pretraining
     collect_data_for_pretraining(path_to_data)

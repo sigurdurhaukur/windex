@@ -1,0 +1,4 @@
+{
+  "watch": ["data.js", "app/**/*"],
+  "ignore": ["data.json", "node_modules", ".next"]
+}

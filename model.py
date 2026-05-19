@@ -1,102 +1,54 @@
-from sklearn.neural_network import MLPRegressor
-from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import mean_squared_error
-import pandas as pd
-from sklearn.model_selection import train_test_split
+import warnings
+from collections import deque
+
+import numpy as np
+from statsmodels.tsa.arima.model import ARIMA
 
 
 class Model:
-    def __init__(self):
-        # Initialize the model and scalers
-        self.model = MLPRegressor(
-            random_state=1,
-            max_iter=800,
-            hidden_layer_sizes=(64, 64),
-            activation="relu",
-            solver="adam",
-            alpha=0.0001,
-            batch_size="auto",
-            learning_rate="constant",
-            learning_rate_init=5e-4,
-        )
+    """MA(q) time-series model: X_t = mu + e_t + theta_1*e_{t-1} + ... + theta_q*e_{t-q}."""
 
-        self.scaler_X = None
-        self.scaler_y = None
+    def __init__(self, q=5, history_size=300):
+        self.q = q
+        self.history_size = history_size
+        self.values = deque(maxlen=history_size)
+        self.fitted = None
 
     def pretrain_model(self, epoch=10, path_to_data="./wind_data.txt", max_iter=800):
-        self.model.max_iter = max_iter
-
-        # Read data from csv file
+        import pandas as pd
         data = pd.read_csv(path_to_data, sep=",", header=None)
         assert data is not None, "Data is empty"
-        X = data[0]  # wind direction (degrees)
-        y = data[1]  # timestamp (unix time)
+        values = data[1].values
+        print(f"Number of data points: {len(values)}")
+        keep = min(len(values), self.history_size)
+        self.values = deque(values[-keep:], maxlen=self.history_size)
+        self._fit()
 
-        # count data points
-        print(f"Number of data points: {len(X)}")
-
-        # Reshape X to be a 2D array
-        X = X.values.reshape(-1, 1)
-
-        # Normalize the data
-        scaler_X = StandardScaler()
-        scaler_y = StandardScaler()
-        X_train, X_test, y_train, y_test = train_test_split(
-            X, y, shuffle=False, test_size=0.2, random_state=1
-        )
-
-        # Fit scaler on training data
-        X_train = scaler_X.fit_transform(X_train)
-        X_test = scaler_X.transform(X_test)
-
-        # It's crucial to scale the output variable for many regression tasks and models
-        y_train = scaler_y.fit_transform(
-            y_train.values.reshape(-1, 1)
-        ).ravel()  # reshaping and flattening y_train
-        y_test = scaler_y.transform(
-            y_test.values.reshape(-1, 1)
-        ).ravel()  # reshaping and flattening y_test
-
-        for i in range(epoch):
-            print(f"Epoch {i}")
-
-            self.model.fit(X_train, y_train)  # Fit the model
-
-            y_pred = self.model.predict(X_test)
-            mse = mean_squared_error(y_test, y_pred)
-            print(f"Mean Squared Error: {mse}")
-
-        self.scaler_X = scaler_X
-        self.scaler_y = scaler_y
+    def _fit(self):
+        if len(self.values) < max(self.q * 3, 20):
+            return
+        try:
+            arr = np.asarray(self.values, dtype=float)
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                self.fitted = ARIMA(arr, order=(0, 0, self.q)).fit()
+        except Exception as e:
+            print(f"MA({self.q}) fit failed: {e}")
+            self.fitted = None
 
     def online_train(self, X, y, x_test=[], y_test=[]):
-        assert self.scaler_X is not None, "Model is not pretrained yet"
-
-        # reduce max_iter to avoid overfitting
-        self.model.max_iter = 2
-
-        # Normalize the data
-        X = self.scaler_X.transform(X)
-        y = self.scaler_y.transform(y.reshape(-1, 1)).ravel()
-
-        self.model = self.model.partial_fit(X, y)
-
-        if len(x_test) > 0 and len(y_test) > 0:
-            x_test = self.scaler_X.transform(x_test)
-            y_test = self.scaler_y.transform(y_test.reshape(-1, 1)).ravel()
-
-            y_pred = self.model.predict(x_test)
-            mse = mean_squared_error(y_test, y_pred)
+        for val in y:
+            self.values.append(float(val))
+        self._fit()
+        if len(x_test) > 0 and len(y_test) > 0 and self.fitted is not None:
+            y_pred = np.asarray(self.fitted.forecast(steps=len(y_test)))
+            mse = float(np.mean((np.asarray(y_test, dtype=float) - y_pred) ** 2))
             print(f"Mean Squared Error: {mse}")
 
-    def predict(self, X):
-        # Normalize the data
-        assert self.scaler_X is not None, "Model is not trained yet"
-        X = X.reshape(-1, 1)
-        X = self.scaler_X.transform(X)
-        y_pred = self.model.predict(X)
-
-        # Inverse the normalization
-        y_pred = self.scaler_y.inverse_transform(y_pred.reshape(-1, 1)).ravel()
-
-        return y_pred
+    def predict(self, X, steps_ahead=None):
+        forecast_len = steps_ahead if steps_ahead is not None else len(X)
+        if self.fitted is None:
+            if len(self.values) == 0:
+                return np.zeros(forecast_len)
+            return np.full(forecast_len, float(np.mean(self.values)))
+        return np.asarray(self.fitted.forecast(steps=forecast_len))

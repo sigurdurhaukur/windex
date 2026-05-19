@@ -6,7 +6,7 @@ const inter = Inter({ subsets: ["latin"] });
 import Nav from "../components/nav";
 
 export const metadata = {
-  title: "windex",
+  title: "Weather Wane 🐓",
   description: "",
 };
 
