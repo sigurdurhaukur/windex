@@ -42,6 +42,7 @@ function loadHistoric() {
     airTemperature: [],
     windSpeed: [],
     airPressure: [],
+    seaLevel: [],
     sensorData: SENSORS.reduce((acc, sensor) => {
       acc[sensor] = { windDirection: [], windSpeed: [] };
       return acc;
@@ -61,6 +62,7 @@ function loadHistoric() {
       airTemperature: parsed.airTemperature || [],
       windSpeed: parsed.windSpeed || [],
       airPressure: parsed.airPressure || [],
+      seaLevel: parsed.seaLevel || [],
       sensorData: parsed.sensorData || empty.sensorData,
     };
   } catch (error) {
@@ -69,7 +71,7 @@ function loadHistoric() {
   }
 }
 
-function saveData(data, maxDataPoints = 1000) {
+function saveData(data, maxDataPoints = 1000, seaLevelPoint = null) {
   const historicData = loadHistoric();
 
   for (const { key, extract } of SERIES) {
@@ -136,10 +138,48 @@ function saveData(data, maxDataPoints = 1000) {
     }
   }
 
+  if (seaLevelPoint && seaLevelPoint.seaLevel != null && seaLevelPoint.timestamp != null) {
+    if (!Array.isArray(historicData.seaLevel)) historicData.seaLevel = [];
+    const lastSl = historicData.seaLevel[historicData.seaLevel.length - 1];
+    if (!lastSl || lastSl.seaLevel !== seaLevelPoint.seaLevel) {
+      historicData.seaLevel.push(seaLevelPoint);
+      if (historicData.seaLevel.length > maxDataPoints) {
+        historicData.seaLevel = historicData.seaLevel.slice(-maxDataPoints);
+      }
+    }
+  }
+
   try {
     fs.writeFileSync(DATA_FILE, JSON.stringify(historicData));
   } catch (error) {
     console.error("Error writing to file:", error);
+  }
+}
+
+const SEA_LEVEL_INTERVAL_MS = 5 * 60 * 1000;
+const SEA_LEVEL_STATION = 1141;
+let lastSeaLevelFetch = 0;
+let pendingSeaLevelPoint = null;
+
+async function fetchLatestSeaLevel() {
+  const url = `https://gagnaveita.vegagerdin.is/api/vedur2014_1`;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      console.error(`[data.js] Sea level API returned ${response.status}`);
+      return null;
+    }
+    const data = await response.json();
+    if (!Array.isArray(data)) return null;
+    const station = data.find((s) => s.Nr === SEA_LEVEL_STATION);
+    if (!station || station.Sjavarhaed == null) return null;
+    return {
+      timestamp: Math.floor(Date.now() / 1000),
+      seaLevel: station.Sjavarhaed,
+    };
+  } catch (error) {
+    console.error("Error fetching sea level:", error);
+    return null;
   }
 }
 
@@ -148,10 +188,19 @@ async function main() {
   const url = `https://iws.isavia.is/weather/${airport_code}`;
   const maxDataPoints = 70000;
 
+  // Refresh sea level on its own 5-minute cadence, ahead of the file write
+  // so it lands in the same load-modify-write cycle as the weather data.
+  if (Date.now() - lastSeaLevelFetch >= SEA_LEVEL_INTERVAL_MS) {
+    lastSeaLevelFetch = Date.now();
+    const point = await fetchLatestSeaLevel();
+    if (point) pendingSeaLevelPoint = point;
+  }
+
   try {
     const response = await fetch(url);
     const data = await response.json();
-    saveData(data, maxDataPoints);
+    saveData(data, maxDataPoints, pendingSeaLevelPoint);
+    pendingSeaLevelPoint = null;
   } catch (error) {
     console.error("Error fetching data:", error);
   }
